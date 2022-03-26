@@ -5,7 +5,7 @@ import { OrderBooks, TradePairs } from "../types/typechain-types";
 import { ContractInfo } from "../types/ContractInfo";
 import { Order } from "../types/Order";
 import { PairInfo } from "../types/PairInfo";
-import _ from "lodash";
+import _, { size } from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { parse } from "path";
 import { OrderHistoryPiece } from "../types/OrderHistoryPiece";
@@ -32,6 +32,7 @@ export class TradingPair {
   sellBook: string;
   OrderStatusChangedListener: TradePairs;
   isBot: Boolean;
+  isUpdatingOrders: boolean;
 
   constructor(api_address: string, pair: string) {
     this.DEXALOT_API = api_address;
@@ -139,6 +140,20 @@ export class TradingPair {
           totalfee: BigNumber
         ) => {
           if (traderaddress === this.wallet.address) {
+            console.log(status);
+
+            switch (status) {
+              case 0: // New order
+                break;
+              case 2: // Partial
+                break;
+              case 3: // Filled
+                break;
+              case 4: // Cancelled
+              default:
+                break;
+            }
+
             const orderIndex = this.Order_List.findIndex((order) => order.id === id);
 
             if (orderIndex !== -1) {
@@ -164,13 +179,21 @@ export class TradingPair {
         ) => {
           this.currentPrice = parseFloat(utils.formatEther(price));
 
-          // if (this.Order_List.find((order) => order.id === maker)) {
-          //   this.Order_List = this.Order_List.filter((order) => order.id !== maker);
-          //   await this.cancelAllOrders();
-          //   console.log("Price : " + this.currentPrice);
-          //   await this.createPairOrder(this.currentPrice, 10, 1);
-          // }
-          // console.log("Executed : ", utils.formatEther(price), utils.formatEther(quantity));
+          const order = this.Order_List.find((order) => order.id === maker);
+          if (order) {
+            this.Order_List = this.Order_List.filter((order) => order.id !== maker);
+            if (!this.isUpdatingOrders) {
+              this.isUpdatingOrders = true;
+              await this.updateOrders();
+              this.isUpdatingOrders = false;
+            }
+            console.log(
+              "This Order has been filled : ",
+              utils.formatEther(price),
+              utils.formatEther(quantity),
+              order.side
+            );
+          }
         }
       );
 
@@ -238,13 +261,14 @@ export class TradingPair {
     }
   }
   public async cancelOrder(orderId: string) {
-    console.log(orderId);
-
-    await this.TradePairs.cancelOrder(this.pairId, orderId)
+    await this.TradePairs.cancelOrder(this.pairId, orderId, {
+      gasLimit: 8000000,
+    })
       .then((tx) => tx.wait())
       .then((receipt) => {
-        console.log(receipt.status);
-        this.Order_List = this.Order_List.filter((order) => order.id !== orderId);
+        if (receipt.status == 1) {
+          this.Order_List = this.Order_List.filter((order) => order.id !== orderId);
+        }
       })
       .catch((error) => {
         console.log("Cancel orders failed");
@@ -287,8 +311,10 @@ export class TradingPair {
     }
     return OrderHistory;
   }
-  public async updateStrategy() {
+  public async updateOrders() {
     const newOrders = buildStrategy(this.currentPrice);
+
+    console.log(this.Order_List.length);
 
     for (let i = 0; i < this.Order_List.length; i++) {
       // If any order is not on the desired order list, cancels it

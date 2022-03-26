@@ -8,7 +8,7 @@ const main = async () => {
   const myPair = new TradingPair(DEXALOT_API, "TEAM1/AVAX");
 
   await myPair.init(false);
-  await myPair.buyOrder(22, 10);
+  await myPair.sellOrder(22, 10);
 };
 
 main();

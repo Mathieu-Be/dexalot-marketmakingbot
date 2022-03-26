@@ -24,8 +24,14 @@ const main = async () => {
 
   while (true) {
     await sleep(Settings.refresh_rate);
-    console.log("Updating strategy...");
-    myPair.updateStrategy();
+    if (!myPair.isUpdatingOrders) {
+      console.log("Updating strategy...");
+      myPair.isUpdatingOrders = true;
+      await myPair.updateOrders();
+      myPair.isUpdatingOrders = true;
+    } else {
+      console.log("Already updating strategy");
+    }
   }
 };
 

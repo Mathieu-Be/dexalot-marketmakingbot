@@ -20,10 +20,10 @@ const main = async () => {
       let coin = Math.floor(Math.random() * 2);
       if (coin === 0) {
         console.log("Buying at : ", sellprice);
-        await myPair.buyOrder(sellprice, 10);
+        await myPair.buyOrder(sellprice, 5);
       } else {
         console.log("Selling at : ", buyprice);
-        await myPair.sellOrder(buyprice, 10);
+        await myPair.sellOrder(buyprice, 5);
       }
     }
   }
