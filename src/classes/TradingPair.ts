@@ -1,7 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { utils, Wallet, ethers } from "ethers";
 import { exit } from "process";
-import { OrderBooks, TradePairs } from "../typechain-types";
+import { OrderBooks, TradePairs } from "../types/typechain-types";
 import { ContractInfo } from "../types/ContractInfo";
 import { Order } from "../types/Order";
 import { PairInfo } from "../types/PairInfo";
