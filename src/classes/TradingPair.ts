@@ -5,27 +5,20 @@ import { OrderBooks, TradePairs } from "../types/typechain-types";
 import { ContractInfo } from "../types/ContractInfo";
 import { Order } from "../types/Order";
 import { PairInfo } from "../types/PairInfo";
-import _, { size } from "lodash";
+import _ from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
-import { parse } from "path";
 import { OrderHistoryPiece } from "../types/OrderHistoryPiece";
 import { buildStrategy } from "../utils/basicstrategy";
-import { Settings } from "../settings";
 import { sleep } from "../utils/sleep";
 import chalk from "chalk";
 
-// const chalk = require("chalk");
-
 export class TradingPair {
-  private Exchange_ContractInfo: ContractInfo;
-  private Portfolio_ContractInfo: ContractInfo;
   private TradePairs_ContractInfo: ContractInfo;
   private Orderbooks_ContractInfo: ContractInfo;
   public Order_List: Order[] = [];
   private buyBook: string;
   public currentPrice: number;
-  count = 0;
-  started = false;
+  private started = false;
 
   private DEXALOT_API = "https://api.dexalot-dev.com/api";
   public TradePairs: TradePairs;
@@ -34,11 +27,9 @@ export class TradingPair {
   private pairId: any;
   private pairInfo: PairInfo;
   private provider: JsonRpcProvider;
-  OrderBook: import("/Users/mathieu/Dev/projets/dexalot-playground/typechain-types/index").OrderBooks;
-  sellBook: string;
-  OrderStatusChangedListener: TradePairs;
-  isBot: Boolean;
-  isUpdatingOrders: boolean;
+  private OrderBook: OrderBooks;
+  private sellBook: string;
+  private isBot: Boolean;
 
   constructor(api_address: string, pair: string, privatekey: string) {
     this.DEXALOT_API = api_address;
@@ -68,20 +59,6 @@ export class TradingPair {
     this.pairId = utils.formatBytes32String(this.pairInfo.pair);
 
     Promise.all([
-      await axios
-        .get(this.DEXALOT_API + "/trading/deploymentabi/Exchange")
-        .then((response) => (this.Exchange_ContractInfo = response.data))
-        .catch((error: AxiosError) => {
-          console.log(error.message);
-          initialisation_status = false;
-        }),
-      await axios
-        .get(this.DEXALOT_API + "/trading/deploymentabi/Portfolio")
-        .then((response) => (this.Portfolio_ContractInfo = response.data))
-        .catch((error: AxiosError) => {
-          console.log(error.message);
-          initialisation_status = false;
-        }),
       await axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/TradePairs")
         .then((response) => (this.TradePairs_ContractInfo = response.data))
@@ -150,8 +127,6 @@ export class TradingPair {
               side: side,
             };
 
-            // console.log("event", status);
-
             switch (status) {
               case 0: // New order
                 {
@@ -166,10 +141,7 @@ export class TradingPair {
                 break;
               case 3: // Filled
                 {
-                  // console.log("order list avant", this.Order_List.length);
-
                   this.Order_List = this.Order_List.filter((order) => order.id !== eventOrder.id);
-                  // console.log("order list après", this.Order_List.length);
 
                   console.log(chalk.green("Order filled", eventOrder.price));
 
@@ -221,7 +193,7 @@ export class TradingPair {
         await this.cancelAllOrders();
       }
 
-      // await this.createPairOrder(this.currentPrice, 10, 1);
+      // Waiting 5 seconds before really reacting to contract events
       await sleep(5);
       this.started = true;
       await this.updateOrders();
@@ -264,8 +236,6 @@ export class TradingPair {
             if (this.isBot) {
               console.log("Filled some existing order, something went wrong");
             }
-          } else {
-            // this.Order_List.push({ id: statusChangeEvent.args.id, side: side, price: price, quantity: quantity });
           }
         }
       })
@@ -281,10 +251,7 @@ export class TradingPair {
       let Order_List_Ids: string[] = [];
       this.Order_List.forEach((order) => Order_List_Ids.push(order.id));
       await this.TradePairs.cancelAllOrders(this.pairId, Order_List_Ids)
-        .then((tx) => tx.wait())
-        .then((receipt) => {
-          // this.Order_List = [];
-        })
+        .then(async (tx) => await tx.wait())
         .catch((error) => {
           console.log("Cancel all orders failed");
           console.log(error);
@@ -353,26 +320,18 @@ export class TradingPair {
   public async updateOrders() {
     const newOrders = buildStrategy(this.currentPrice);
     console.log("Updating strategy...");
-    let cancelled = 0;
-    let added = 0;
-
-    // console.log(this.Order_List.length);
 
     for (let i = 0; i < this.Order_List.length; i++) {
       // If any order is not on the desired order list, cancels it
       if (!newOrders.find((order) => order.price === this.Order_List[i].price)) {
-        // console.log("Cancelling order", this.Order_List[i].price);
         await this.cancelOrder(this.Order_List[i].id);
-        cancelled += 1;
       }
     }
 
     for (let i = 0; i < newOrders.length; i++) {
       // If any desired order is not on the current order list, creates it
       if (!this.Order_List.find((order) => order.price === newOrders[i].price)) {
-        // console.log("Creating Order", newOrders[i].price);
         await this.placeOrder(newOrders[i].price, newOrders[i].quantity, newOrders[i].side);
-        added += 1;
       }
     }
 

@@ -4,7 +4,6 @@ import { exit } from "process";
 import { ERC20, ERC20__factory, OrderBooks, Portfolio, TradePairs } from "../types/typechain-types";
 import { ContractInfo } from "../types/ContractInfo";
 import { Order } from "../types/Order";
-import { PairInfo } from "../types/PairInfo";
 import _ from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
 
