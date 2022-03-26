@@ -1,5 +1,4 @@
 import { Settings } from "../settings";
-import { Order } from "../types/Order";
 import { OrderBackbone } from "../types/OrderBackbone";
 
 export const buildStrategy = (currentPrice: number) => {

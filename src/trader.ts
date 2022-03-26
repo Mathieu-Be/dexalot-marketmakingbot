@@ -14,8 +14,8 @@ const main = async () => {
   await myPair.init(false);
 
   while (true) {
-    let delay = Math.floor(Math.random() * 15);
-    await sleep(delay + 15);
+    let delay = Math.floor(Math.random() * 9);
+    await sleep(delay + 2); // Wait between 2 and 10 sec between trades
 
     let buyprice = parseFloat(utils.formatEther(await myPair.getTopBuyOrder()));
     let sellprice = parseFloat(utils.formatEther(await myPair.getTopSellOrder()));

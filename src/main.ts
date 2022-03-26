@@ -1,23 +1,23 @@
-import { Wallet } from "ethers";
 import { exit } from "process";
 import { TradingPair } from "./classes/TradingPair";
 import { Settings } from "./settings";
 import { sleep } from "./utils/sleep";
+import dotenv from "dotenv";
+dotenv.config();
 
-const DEXALOT_API = "https://api.dexalot-dev.com/api";
-const spread = 10;
 let hasExited = false;
 
 const main = async () => {
-  const myPair = new TradingPair(
-    DEXALOT_API,
-    "TEAM1/AVAX",
-    "0x49b5635429cb8a08341aef4263c761e64b056c2e9c9a054316bafd04d5a9a44a"
-  );
+  // TradindPair creation
+  const myPair = new TradingPair(process.env.DEXALOT_API, "TEAM1/AVAX", process.env.BOT_PRIVATE_KEY);
 
+  // TradingPair initalisation
+  // All event listeners are created
   await myPair.init();
 
+  // Closing every position on volontary exit ^C
   process.on("SIGINT", async () => {
+    // Prevent double triggers of the event
     if (!hasExited) {
       hasExited = true;
       console.log();
@@ -27,19 +27,15 @@ const main = async () => {
     }
   });
 
+  // Temporal loop to update position from time to time if orders are never filled
   while (true) {
     await sleep(Settings.refresh_rate);
-    // if (!myPair.isUpdatingOrders) {
-    //   console.log("Updating strategy...");
-    //   myPair.isUpdatingOrders = true;
-    //   await myPair.updateOrders();
-    //   myPair.isUpdatingOrders = true;
-    // } else {
-    //   console.log("Already updating strategy");
-    // }
+    console.log("Updating strategy...");
+    await myPair.updateOrders();
   }
 };
 
+// For the ^C event
 process.stdin.resume();
 
 main().then(() => exit(0));
