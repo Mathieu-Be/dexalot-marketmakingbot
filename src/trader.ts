@@ -5,13 +5,17 @@ const DEXALOT_API = "https://api.dexalot-dev.com/api";
 const spread = 10;
 
 const main = async () => {
-  const myPair = new TradingPair(DEXALOT_API, "TEAM1/AVAX");
+  const myPair = new TradingPair(
+    DEXALOT_API,
+    "TEAM1/AVAX",
+    "0xfe54029d14ff462d42b40067b4e1b7f5969ec3e03237e650074b24e80419f3c7"
+  );
 
   await myPair.init(false);
 
   while (true) {
     let delay = Math.floor(Math.random() * 15);
-    await sleep(delay);
+    await sleep(delay + 15);
 
     let buyprice = parseFloat(utils.formatEther(await myPair.getTopBuyOrder()));
     let sellprice = parseFloat(utils.formatEther(await myPair.getTopSellOrder()));
