@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "bot": "npx ts-node ./src/main.ts",
+    "trader": "npx ts-node ./src/trader.ts",
+    "createorderbook": "npx ts-node ./src/createOrderBook.ts",
+    "orderbook": "npx ts-node ./src/orderbook.ts",
+    "exit": "npx ts-node ./src/exit.ts"
   },
   "keywords": [],
   "author": "",

@@ -9,6 +9,8 @@ import _ from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
 import { parse } from "path";
 import { OrderHistoryPiece } from "../types/OrderHistoryPiece";
+import { buildStrategy } from "../utils/basicstrategy";
+import { Settings } from "../settings";
 
 export class TradingPair {
   private Exchange_ContractInfo: ContractInfo;
@@ -29,6 +31,7 @@ export class TradingPair {
   OrderBook: import("/Users/mathieu/Dev/projets/dexalot-playground/typechain-types/index").OrderBooks;
   sellBook: string;
   OrderStatusChangedListener: TradePairs;
+  isBot: Boolean;
 
   constructor(api_address: string, pair: string) {
     this.DEXALOT_API = api_address;
@@ -44,7 +47,7 @@ export class TradingPair {
 
   public async init(createListeners: Boolean = true) {
     let initialisation_status = true;
-
+    this.isBot = createListeners;
     let PairInfo_List: PairInfo[] = [];
     const pairs = await axios
       .get(this.DEXALOT_API + "/trading/pairs")
@@ -135,7 +138,14 @@ export class TradingPair {
           quantityfilled: BigNumber,
           totalfee: BigNumber
         ) => {
-          // console.log(traderaddress, id, utils.formatEther(price), utils.formatEther(quantity));
+          if (traderaddress === this.wallet.address) {
+            const orderIndex = this.Order_List.findIndex((order) => order.id === id);
+
+            if (orderIndex !== -1) {
+              this.Order_List[orderIndex].status = status;
+              this.Order_List[orderIndex].quantityfilled = utils.formatEther(quantityfilled);
+            }
+          }
         }
       );
 
@@ -154,29 +164,29 @@ export class TradingPair {
         ) => {
           this.currentPrice = parseFloat(utils.formatEther(price));
 
-          if (this.Order_List.find((order) => order.id === maker)) {
-            this.Order_List = this.Order_List.filter((order) => order.id !== maker);
-            await this.cancelAllOrders();
-            console.log("Price : " + this.currentPrice);
-            await this.createPairOrder(this.currentPrice, 10, 1);
-          }
+          // if (this.Order_List.find((order) => order.id === maker)) {
+          //   this.Order_List = this.Order_List.filter((order) => order.id !== maker);
+          //   await this.cancelAllOrders();
+          //   console.log("Price : " + this.currentPrice);
+          //   await this.createPairOrder(this.currentPrice, 10, 1);
+          // }
           // console.log("Executed : ", utils.formatEther(price), utils.formatEther(quantity));
         }
       );
 
-      await this.cancelAllOrders();
+      if (this.Order_List.length > 0) {
+        console.log(`${this.Order_List.length} positions opened at startup, closing them...`);
+        await this.cancelAllOrders();
+      }
       await this.createPairOrder(this.currentPrice, 10, 1);
     }
   }
-
   public async buyOrder(price: number, quantity: number) {
     await this.placeOrder(price, quantity, 0);
   }
-
   public async sellOrder(price: number, quantity: number) {
     await this.placeOrder(price, quantity, 1);
   }
-
   private async placeOrder(price: number, quantity: number, side: number) {
     await this.TradePairs.addOrder(
       this.pairId,
@@ -196,7 +206,9 @@ export class TradingPair {
         } else {
           const statusChangeEvent = receipt.events.find((event) => event.event === "OrderStatusChanged");
           if (statusChangeEvent.args.status !== 0) {
-            console.log("Filled some existing order, something went wrong");
+            if (this.isBot) {
+              console.log("Filled some existing order, something went wrong");
+            }
           } else {
             this.Order_List.push({ id: statusChangeEvent.args.id, side: side, price: price, quantity: quantity });
           }
@@ -208,7 +220,6 @@ export class TradingPair {
         exit(1);
       });
   }
-
   public async cancelAllOrders() {
     if (this.Order_List.length > 0) {
       console.log(`Cancelling ${this.Order_List.length} positions`);
@@ -226,7 +237,6 @@ export class TradingPair {
         });
     }
   }
-
   public async cancelOrder(orderId: string) {
     console.log(orderId);
 
@@ -242,7 +252,6 @@ export class TradingPair {
         exit(1);
       });
   }
-
   public async getTopBuyOrder() {
     return await this.OrderBook.nextPrice(this.buyBook, 0, 0);
   }
@@ -259,15 +268,12 @@ export class TradingPair {
     await this.buyOrder(price - spread, quantity);
     await this.sellOrder(price + spread, quantity);
   }
-
   public async getBuyBook() {
     return await this.getBook(this.buyBook, 1);
   }
-
   public async getSellBook() {
     return await this.getBook(this.sellBook, 1);
   }
-
   private async getBook(book: string, order: number) {
     let OrderHistory: OrderHistoryPiece[] = [];
     let OrderHistoryRaw = await this.OrderBook.getNOrdersOld(book, 100, order);
@@ -280,5 +286,24 @@ export class TradingPair {
       }
     }
     return OrderHistory;
+  }
+  public async updateStrategy() {
+    const newOrders = buildStrategy(this.currentPrice);
+
+    for (let i = 0; i < this.Order_List.length; i++) {
+      // If any order is not on the desired order list, cancels it
+      if (!newOrders.find((order) => order.price === this.Order_List[i].price)) {
+        console.log("Cancelling order", this.Order_List[i].price);
+        await this.cancelOrder(this.Order_List[i].id);
+      }
+    }
+
+    for (let i = 0; i < newOrders.length; i++) {
+      // If any desired order is not on the current order list, creates it
+      if (!this.Order_List.find((order) => order.price === newOrders[i].price)) {
+        console.log("Creating Order", newOrders[i].price);
+        await this.placeOrder(newOrders[i].price, newOrders[i].quantity, newOrders[i].side);
+      }
+    }
   }
 }

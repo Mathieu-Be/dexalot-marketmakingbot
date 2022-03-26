@@ -1,13 +1,12 @@
-export interface Order {
+import { OrderBackbone } from "./OrderBackbone";
+
+export interface Order extends OrderBackbone {
   id: string;
   traderaddress?: string;
   tx?: string;
   pair?: string;
   type?: number;
   type2?: number;
-  side: number;
-  price: number;
-  quantity: number;
   totalamount?: string;
   status?: number;
   ts?: string;
