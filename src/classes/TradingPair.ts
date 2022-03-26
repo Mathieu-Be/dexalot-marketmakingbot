@@ -1,5 +1,5 @@
 import axios, { AxiosError } from "axios";
-import { utils, Wallet, ethers } from "ethers";
+import { utils, Wallet, ethers, BigNumber } from "ethers";
 import { exit } from "process";
 import { OrderBooks, TradePairs } from "../types/typechain-types";
 import { ContractInfo } from "../types/ContractInfo";
@@ -7,6 +7,8 @@ import { Order } from "../types/Order";
 import { PairInfo } from "../types/PairInfo";
 import _ from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
+import { parse } from "path";
+import { OrderHistoryPiece } from "../types/OrderHistoryPiece";
 
 export class TradingPair {
   private Exchange_ContractInfo: ContractInfo;
@@ -15,9 +17,10 @@ export class TradingPair {
   private Orderbooks_ContractInfo: ContractInfo;
   public Order_List: Order[] = [];
   private buyBook: string;
+  public currentPrice: number;
 
   private DEXALOT_API = "https://api.dexalot-dev.com/api";
-  private TradePairs: TradePairs;
+  public TradePairs: TradePairs;
   private wallet: Wallet;
   private pair: string;
   private pairId: any;
@@ -25,6 +28,7 @@ export class TradingPair {
   private provider: JsonRpcProvider;
   OrderBook: import("/Users/mathieu/Dev/projets/dexalot-playground/typechain-types/index").OrderBooks;
   sellBook: string;
+  OrderStatusChangedListener: TradePairs;
 
   constructor(api_address: string, pair: string) {
     this.DEXALOT_API = api_address;
@@ -38,7 +42,7 @@ export class TradingPair {
     this.sellBook = utils.formatBytes32String(`${this.pair}-SELLBOOK`);
   }
 
-  public async init() {
+  public async init(createListeners: Boolean = true) {
     let initialisation_status = true;
 
     let PairInfo_List: PairInfo[] = [];
@@ -107,8 +111,61 @@ export class TradingPair {
 
     if (!initialisation_status) {
       console.log("Initialisation failed !");
-
       exit(1);
+    }
+
+    this.currentPrice = await this.getOrderBookMiddle();
+    if (this.currentPrice === 0) {
+      this.currentPrice = 15; //Arbitrary price if order book is empty
+    }
+
+    if (createListeners) {
+      this.TradePairs.on(
+        "OrderStatusChanged",
+        (
+          traderaddress: string,
+          pair: string,
+          id: string,
+          price: BigNumber,
+          totalamount: BigNumber,
+          quantity: BigNumber,
+          side: number,
+          type1: number,
+          status: number,
+          quantityfilled: BigNumber,
+          totalfee: BigNumber
+        ) => {
+          // console.log(traderaddress, id, utils.formatEther(price), utils.formatEther(quantity));
+        }
+      );
+
+      this.TradePairs.on(
+        "Executed",
+        async (
+          pair: string,
+          price: BigNumber,
+          quantity: BigNumber,
+          maker: string,
+          taker: string,
+          feeMaker: BigNumber,
+          feeTaker: BigNumber,
+          feeMakerBase: Boolean,
+          execId: BigNumber
+        ) => {
+          this.currentPrice = parseFloat(utils.formatEther(price));
+
+          if (this.Order_List.find((order) => order.id === maker)) {
+            this.Order_List = this.Order_List.filter((order) => order.id !== maker);
+            await this.cancelAllOrders();
+            console.log("Price : " + this.currentPrice);
+            await this.createPairOrder(this.currentPrice, 10, 1);
+          }
+          // console.log("Executed : ", utils.formatEther(price), utils.formatEther(quantity));
+        }
+      );
+
+      await this.cancelAllOrders();
+      await this.createPairOrder(this.currentPrice, 10, 1);
     }
   }
 
@@ -126,7 +183,10 @@ export class TradingPair {
       utils.parseUnits(price.toFixed(this.pairInfo.quotedisplaydecimals), this.pairInfo.quote_evmdecimals),
       utils.parseUnits(quantity.toFixed(this.pairInfo.basedisplaydecimals), this.pairInfo.base_evmdecimals),
       side,
-      1
+      1,
+      {
+        gasLimit: 8000000,
+      }
     )
       .then((tx) => tx.wait())
       .then((receipt) => {
@@ -157,7 +217,6 @@ export class TradingPair {
       await this.TradePairs.cancelAllOrders(this.pairId, Order_List_Ids)
         .then((tx) => tx.wait())
         .then((receipt) => {
-          console.log(receipt.status);
           this.Order_List = [];
         })
         .catch((error) => {
@@ -189,5 +248,37 @@ export class TradingPair {
   }
   public async getTopSellOrder() {
     return await this.OrderBook.nextPrice(this.sellBook, 1, 0);
+  }
+  public async getOrderBookMiddle() {
+    const sellprice = await this.getTopSellOrder();
+    const buyprice = await this.getTopBuyOrder();
+    const price = buyprice.add(sellprice).div(2);
+    return parseFloat(utils.formatEther(price));
+  }
+  public async createPairOrder(price: number, quantity: number, spread: number) {
+    await this.buyOrder(price - spread, quantity);
+    await this.sellOrder(price + spread, quantity);
+  }
+
+  public async getBuyBook() {
+    return await this.getBook(this.buyBook, 1);
+  }
+
+  public async getSellBook() {
+    return await this.getBook(this.sellBook, 1);
+  }
+
+  private async getBook(book: string, order: number) {
+    let OrderHistory: OrderHistoryPiece[] = [];
+    let OrderHistoryRaw = await this.OrderBook.getNOrdersOld(book, 100, order);
+    for (let i = 0; i < OrderHistoryRaw[0].length; i++) {
+      if (parseFloat(utils.formatEther(OrderHistoryRaw[1][i])) > 0) {
+        OrderHistory.push({
+          price: parseFloat(utils.formatEther(OrderHistoryRaw[0][i])),
+          quantity: parseFloat(utils.formatEther(OrderHistoryRaw[1][i])),
+        });
+      }
+    }
+    return OrderHistory;
   }
 }
