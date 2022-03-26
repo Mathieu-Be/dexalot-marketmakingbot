@@ -250,6 +250,15 @@ export class TradingPair {
           console.log("Order failed");
           exit(1);
         } else {
+          console.log(
+            chalk.gray.italic(
+              "Gas paid for placing order : " +
+                utils.formatUnits(receipt.gasUsed, "wei") +
+                " at " +
+                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
+            )
+          );
+
           const statusChangeEvent = receipt.events.find((event) => event.event === "OrderStatusChanged");
           if (statusChangeEvent.args.status !== 0) {
             if (this.isBot) {
@@ -290,7 +299,14 @@ export class TradingPair {
       .then((tx) => tx.wait())
       .then((receipt) => {
         if (receipt.status == 1) {
-          // this.Order_List = this.Order_List.filter((order) => order.id !== orderId);
+          console.log(
+            chalk.gray.italic(
+              "Gas paid for cancelling order : " +
+                utils.formatUnits(receipt.gasUsed, "wei") +
+                " at " +
+                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
+            )
+          );
         }
       })
       .catch((error) => {

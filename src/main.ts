@@ -22,8 +22,8 @@ const main = async () => {
       hasExited = true;
       console.log();
       await myPair.cancelAllOrders();
-      myPair.TradePairs.removeAllListeners();
-      return;
+      await sleep(5);
+      exit(0);
     }
   });
 
@@ -42,4 +42,4 @@ const main = async () => {
 
 process.stdin.resume();
 
-main();
+main().then(() => exit(0));
