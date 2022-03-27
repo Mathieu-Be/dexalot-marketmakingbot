@@ -34,15 +34,15 @@ export class PortfolioClass {
   public async init() {
     let initialisation_status = true;
 
-    Promise.all([
-      await axios
+    await Promise.all([
+      axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/Portfolio")
         .then((response) => (this.Portfolio_ContractInfo = response.data))
         .catch((error: AxiosError) => {
           console.log(error.message);
           initialisation_status = false;
         }),
-      await axios
+      axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/OrderBooks")
         .then((response) => (this.Orderbooks_ContractInfo = response.data))
         .catch((error: AxiosError) => {
