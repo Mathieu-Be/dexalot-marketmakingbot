@@ -23,7 +23,7 @@ A trader bot can be launched to take positions from the market maker. It takes r
 
 ## Limits
 
-If the DExalot API is down I can't cancels orders after a crash.  
+If the Dexalot API is down I can't cancels orders after a crash.  
 Only works with 18 decimals ERC20s against AVAX (decimals poorly handled).
 Would not work very well if we want to place several buy or sell orders in our strategy.
 
