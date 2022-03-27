@@ -11,6 +11,7 @@ import { OrderHistoryPiece } from "../types/OrderHistoryPiece";
 import { buildStrategy } from "../utils/basicstrategy";
 import { sleep } from "../utils/sleep";
 import chalk from "chalk";
+import { Settings } from "../settings";
 
 export class TradingPair {
   private TradePairs_ContractInfo: ContractInfo;
@@ -100,7 +101,7 @@ export class TradingPair {
 
     this.currentPrice = await this.getOrderBookMiddle();
     if (this.currentPrice === 0) {
-      this.currentPrice = 15; //Arbitrary price if order book is empty
+      this.currentPrice = Settings.initial_price; //Arbitrary price if order book is empty
     }
 
     if (createListeners) {
@@ -324,9 +325,20 @@ export class TradingPair {
     return OrderHistory;
   }
   public async updateOrders() {
-    let newOrders = buildStrategy(this.currentPrice);
+    // The price taken into acount is the middle of the orderbook
+    let price = await this.getOrderBookMiddle();
+
+    // If the sell book or the buy book are emtpy, takes the last price
+    if (!(price > 0)) {
+      price = this.currentPrice;
+    }
+
+    // Building the market making strategy
+    let newOrders = buildStrategy(price);
+
     console.log("Updating strategy...");
 
+    // Calculating gas costs for replacing an order
     let cancelOrderCostGwei = BigNumber.from(0);
     let addOrderCostGwei = BigNumber.from(0);
     const gasPrice = await this.provider.getGasPrice();

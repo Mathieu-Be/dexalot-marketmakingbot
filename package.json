@@ -4,13 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "balances": "npx ts-node ./src/balances.ts",
+    "deposit": "npx ts-node ./src/deposit.ts",
     "bot": "npx ts-node ./src/main.ts",
     "trader": "npx ts-node ./src/trader.ts",
     "createorderbook": "npx ts-node ./src/createOrderBook.ts",
     "orderbook": "npx ts-node ./src/orderbook.ts",
-    "exit": "npx ts-node ./src/exit.ts",
-    "balances": "npx ts-node ./src/balances.ts",
-    "deposit": "npx ts-node ./src/deposit.ts"
+    "exit": "npx ts-node ./src/exit.ts"
   },
   "keywords": [],
   "author": "",
