@@ -9,7 +9,7 @@ let hasExited = false;
 
 const main = async () => {
   // TradindPair creation
-  const myPair = new TradingPair(process.env.DEXALOT_API, "TEAM1/AVAX", process.env.BOT_PRIVATE_KEY);
+  const myPair = new TradingPair("TEAM1/AVAX", process.env.BOT_PRIVATE_KEY);
 
   // TradingPair initalisation
   // All event listeners are created

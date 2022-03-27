@@ -6,6 +6,8 @@ import { ContractInfo } from "../types/ContractInfo";
 import { Order } from "../types/Order";
 import _ from "lodash";
 import { JsonRpcProvider } from "@ethersproject/providers";
+import dotenv from "dotenv";
+dotenv.config();
 
 const MAX_UINT = BigNumber.from(2).pow(256).sub(1);
 
@@ -15,7 +17,7 @@ export class PortfolioClass {
   public Order_List: Order[] = [];
   public currentPrice: number;
 
-  private DEXALOT_API = "https://api.dexalot-dev.com/api";
+  private DEXALOT_API = process.env.DEXALOT_API;
   public TradePairs: TradePairs;
   private wallet: Wallet;
   private provider: JsonRpcProvider;
@@ -23,9 +25,8 @@ export class PortfolioClass {
   private tokenbase: string;
   private ERC20: ERC20;
 
-  constructor(api_address: string, tokenbase: string, privatekey: string) {
-    this.DEXALOT_API = api_address;
-    this.provider = new ethers.providers.JsonRpcProvider("https://node.dexalot-dev.com/ext/bc/C/rpc");
+  constructor(tokenbase: string, privatekey: string) {
+    this.provider = new ethers.providers.JsonRpcProvider(process.env.DEXALOT_RPC);
     this.wallet = new ethers.Wallet(privatekey, this.provider);
     this.tokenbase = tokenbase;
   }

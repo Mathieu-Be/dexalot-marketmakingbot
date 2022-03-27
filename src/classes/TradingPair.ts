@@ -12,6 +12,8 @@ import { buildStrategy } from "../utils/basicstrategy";
 import { sleep } from "../utils/sleep";
 import chalk from "chalk";
 import { Settings } from "../settings";
+import dotenv from "dotenv";
+dotenv.config();
 
 export class TradingPair {
   private TradePairs_ContractInfo: ContractInfo;
@@ -21,7 +23,7 @@ export class TradingPair {
   public currentPrice: number;
   private started = false;
 
-  private DEXALOT_API = "https://api.dexalot-dev.com/api";
+  private DEXALOT_API;
   public TradePairs: TradePairs;
   private wallet: Wallet;
   private pair: string;
@@ -32,9 +34,9 @@ export class TradingPair {
   private sellBook: string;
   private isBot: Boolean;
 
-  constructor(api_address: string, pair: string, privatekey: string) {
-    this.DEXALOT_API = api_address;
-    this.provider = new ethers.providers.JsonRpcProvider("https://node.dexalot-dev.com/ext/bc/C/rpc");
+  constructor(pair: string, privatekey: string) {
+    this.DEXALOT_API = process.env.DEXALOT_API;
+    this.provider = new ethers.providers.JsonRpcProvider(process.env.DEXALOT_RPC);
     this.wallet = new ethers.Wallet(privatekey, this.provider);
     this.pair = pair;
     this.buyBook = utils.formatBytes32String(`${this.pair}-BUYBOOK`);

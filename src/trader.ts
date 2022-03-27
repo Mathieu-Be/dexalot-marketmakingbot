@@ -1,15 +1,8 @@
 import { TradingPair } from "./classes/TradingPair";
 import { utils } from "ethers";
 
-const DEXALOT_API = "https://api.dexalot-dev.com/api";
-const spread = 10;
-
 const main = async () => {
-  const myPair = new TradingPair(
-    DEXALOT_API,
-    "TEAM1/AVAX",
-    "0xfe54029d14ff462d42b40067b4e1b7f5969ec3e03237e650074b24e80419f3c7"
-  );
+  const myPair = new TradingPair("TEAM1/AVAX", "0xfe54029d14ff462d42b40067b4e1b7f5969ec3e03237e650074b24e80419f3c7");
 
   await myPair.init(false);
 

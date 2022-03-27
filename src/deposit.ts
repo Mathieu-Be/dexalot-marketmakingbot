@@ -4,7 +4,6 @@ dotenv.config();
 
 const main = async () => {
   const myPortfolio = new PortfolioClass(
-    process.env.DEXALOT_API,
     "TEAM1", // Base token, this only works if it is against AVAX
     process.env.BOT_PRIVATE_KEY
   );
