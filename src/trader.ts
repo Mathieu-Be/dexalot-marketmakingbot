@@ -20,7 +20,7 @@ const main = async () => {
     let buyprice = parseFloat(utils.formatEther(await myPair.getTopBuyOrder()));
     let sellprice = parseFloat(utils.formatEther(await myPair.getTopSellOrder()));
 
-    if (buyprice !== 0 && sellprice !== 0) {
+    if (buyprice > 4 && sellprice > 4) {
       let coin = Math.floor(Math.random() * 2);
       if (coin === 0) {
         console.log("Buying at : ", sellprice);
