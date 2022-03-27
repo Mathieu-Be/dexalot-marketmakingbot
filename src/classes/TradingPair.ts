@@ -59,22 +59,22 @@ export class TradingPair {
     }
     this.pairId = utils.formatBytes32String(this.pairInfo.pair);
 
-    Promise.all([
-      await axios
+    await Promise.all([
+      axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/TradePairs")
         .then((response) => (this.TradePairs_ContractInfo = response.data))
         .catch((error: AxiosError) => {
           console.log(error.message);
           initialisation_status = false;
         }),
-      await axios
+      axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/OrderBooks")
         .then((response) => (this.Orderbooks_ContractInfo = response.data))
         .catch((error: AxiosError) => {
           console.log(error.message);
           initialisation_status = false;
         }),
-      await axios
+      axios
         .get(this.DEXALOT_API + `/trading/openorders/param?traderaddress=${this.wallet.address}&pair=${this.pair}`)
         .then((response) => (this.Order_List = response.data.rows))
         .catch((error: AxiosError) => {
@@ -196,8 +196,8 @@ export class TradingPair {
         await this.cancelAllOrders();
       }
 
-      // Waiting 5 seconds before really reacting to contract events
-      await sleep(5);
+      // Waiting 4 seconds before really reacting to contract events
+      await sleep(4);
       this.started = true;
       await this.updateOrders();
     }
@@ -254,7 +254,10 @@ export class TradingPair {
       let Order_List_Ids: string[] = [];
       this.Order_List.forEach((order) => Order_List_Ids.push(order.id));
       await this.TradePairs.cancelAllOrders(this.pairId, Order_List_Ids)
-        .then(async (tx) => await tx.wait())
+        .then(async (tx) => {
+          this.Order_List = [];
+          await tx.wait();
+        })
         .catch((error) => {
           console.log("Cancel all orders failed");
           console.log(error);
