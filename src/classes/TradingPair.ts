@@ -47,6 +47,8 @@ export class TradingPair {
     let initialisation_status = true;
     this.isBot = createListeners;
     let PairInfo_List: PairInfo[] = [];
+
+    // Pair initialisation
     const pairs = await axios
       .get(this.DEXALOT_API + "/trading/pairs")
       .then((response) => {
@@ -61,6 +63,7 @@ export class TradingPair {
     }
     this.pairId = utils.formatBytes32String(this.pairInfo.pair);
 
+    // API initialisation
     await Promise.all([
       axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/TradePairs")
@@ -84,6 +87,7 @@ export class TradingPair {
         }),
     ]);
 
+    // Contract initialisation
     this.TradePairs = new ethers.Contract(
       this.TradePairs_ContractInfo.address,
       this.TradePairs_ContractInfo.abi.abi,
@@ -96,16 +100,19 @@ export class TradingPair {
       this.wallet
     ) as OrderBooks;
 
+    // Exit if initialisation failed
     if (!initialisation_status) {
       console.log("Initialisation failed !");
       exit(1);
     }
 
+    // Fetching initial price
     this.currentPrice = await this.getOrderBookMiddle();
     if (this.currentPrice === 0) {
       this.currentPrice = Settings.initial_price; //Arbitrary price if order book is empty
     }
 
+    // Creating contract listeners only if we are in "bot" mode (I use the same classe for more basic usage)
     if (createListeners) {
       // "Order status changed event"
       this.TradePairs.on(
@@ -193,6 +200,7 @@ export class TradingPair {
         }
       );
 
+      // Cancelling any previous orders (bot crashed)
       if (this.Order_List.length > 0) {
         console.log(`${this.Order_List.length} positions opened at startup, closing them...`);
         await this.cancelAllOrders();
@@ -201,133 +209,9 @@ export class TradingPair {
       // Waiting 4 seconds before really reacting to contract events
       await sleep(4);
       this.started = true;
+      // First set of orders
       await this.updateOrders();
     }
-  }
-  public async buyOrder(price: number, quantity: number) {
-    await this.placeOrder(price, quantity, 0);
-  }
-  public async sellOrder(price: number, quantity: number) {
-    await this.placeOrder(price, quantity, 1);
-  }
-  private async placeOrder(price: number, quantity: number, side: number) {
-    await this.TradePairs.addOrder(
-      this.pairId,
-      utils.parseUnits(price.toFixed(this.pairInfo.quotedisplaydecimals), this.pairInfo.quote_evmdecimals),
-      utils.parseUnits(quantity.toFixed(this.pairInfo.basedisplaydecimals), this.pairInfo.base_evmdecimals),
-      side,
-      1,
-      {
-        gasLimit: 8000000,
-      }
-    )
-      .then((tx) => tx.wait())
-      .then((receipt) => {
-        if (receipt.status !== 1) {
-          console.log("Order failed");
-          exit(1);
-        } else {
-          console.log(
-            chalk.gray.italic(
-              "Gas paid for placing order : " +
-                utils.formatUnits(receipt.gasUsed, "wei") +
-                " at " +
-                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
-            )
-          );
-
-          const statusChangeEvent = receipt.events.find((event) => event.event === "OrderStatusChanged");
-          if (statusChangeEvent.args.status !== 0) {
-            if (this.isBot) {
-              console.log("Filled some existing order, something went wrong");
-            }
-          }
-        }
-      })
-      .catch((error) => {
-        console.log("placeOrder failed");
-        console.log(error);
-        exit(1);
-      });
-  }
-  public async cancelAllOrders() {
-    if (this.Order_List.length > 0) {
-      console.log(`Cancelling ${this.Order_List.length} positions`);
-      let Order_List_Ids: string[] = [];
-      this.Order_List.forEach((order) => Order_List_Ids.push(order.id));
-      await this.TradePairs.cancelAllOrders(this.pairId, Order_List_Ids)
-        .then(async (tx) => {
-          this.Order_List = [];
-          await tx.wait();
-        })
-        .catch((error) => {
-          console.log("Cancel all orders failed");
-          console.log(error);
-          exit(1);
-        });
-    }
-  }
-  public async cancelOrder(orderId: string) {
-    await this.TradePairs.cancelOrder(this.pairId, orderId, {
-      gasLimit: 8000000,
-    })
-      .then((tx) => tx.wait())
-      .then((receipt) => {
-        if (receipt.status == 1) {
-          console.log(
-            chalk.gray.italic(
-              "Gas paid for cancelling order : " +
-                utils.formatUnits(receipt.gasUsed, "wei") +
-                " at " +
-                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
-            )
-          );
-        }
-      })
-      .catch((error) => {
-        console.log("Cancel orders failed");
-        console.log(error);
-        exit(1);
-      });
-  }
-  public async getTopBuyOrder() {
-    return await this.OrderBook.nextPrice(this.buyBook, 0, 0);
-  }
-  public async getTopSellOrder() {
-    return await this.OrderBook.nextPrice(this.sellBook, 1, 0);
-  }
-  public async getOrderBookMiddle() {
-    const sellprice = await this.getTopSellOrder();
-    const buyprice = await this.getTopBuyOrder();
-    if (sellprice.gt(0) && buyprice.gt(0)) {
-      const price = buyprice.add(sellprice).div(2);
-      return parseFloat(utils.formatEther(price));
-    } else {
-      return 0;
-    }
-  }
-  public async createPairOrder(price: number, quantity: number, spread: number) {
-    await this.buyOrder(price - spread, quantity);
-    await this.sellOrder(price + spread, quantity);
-  }
-  public async getBuyBook() {
-    return await this.getBook(this.buyBook, 1);
-  }
-  public async getSellBook() {
-    return await this.getBook(this.sellBook, 1);
-  }
-  private async getBook(book: string, order: number) {
-    let OrderHistory: OrderHistoryPiece[] = [];
-    let OrderHistoryRaw = await this.OrderBook.getNOrdersOld(book, 100, order);
-    for (let i = 0; i < OrderHistoryRaw[0].length; i++) {
-      if (parseFloat(utils.formatEther(OrderHistoryRaw[1][i])) > 0) {
-        OrderHistory.push({
-          price: parseFloat(utils.formatEther(OrderHistoryRaw[0][i])),
-          quantity: parseFloat(utils.formatEther(OrderHistoryRaw[1][i])),
-        });
-      }
-    }
-    return OrderHistory;
   }
   public async updateOrders() {
     // The price taken into acount is the middle of the orderbook
@@ -402,5 +286,132 @@ export class TradingPair {
 
     await sleep(3);
     console.log("Waiting for trades...");
+  }
+  public async buyOrder(price: number, quantity: number) {
+    await this.placeOrder(price, quantity, 0);
+  }
+  public async sellOrder(price: number, quantity: number) {
+    await this.placeOrder(price, quantity, 1);
+  }
+  private async placeOrder(price: number, quantity: number, side: number) {
+    await this.TradePairs.addOrder(
+      this.pairId,
+      utils.parseUnits(price.toFixed(this.pairInfo.quotedisplaydecimals), this.pairInfo.quote_evmdecimals),
+      utils.parseUnits(quantity.toFixed(this.pairInfo.basedisplaydecimals), this.pairInfo.base_evmdecimals),
+      side,
+      1,
+      {
+        gasLimit: 8000000,
+      }
+    )
+      .then((tx) => tx.wait())
+      .then((receipt) => {
+        if (receipt.status !== 1) {
+          console.log("Order failed");
+          exit(1);
+        } else {
+          // this.Order_List is update by the contract listener
+          console.log(
+            chalk.gray.italic(
+              "Gas paid for placing order : " +
+                utils.formatUnits(receipt.gasUsed, "wei") +
+                " at " +
+                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
+            )
+          );
+
+          const statusChangeEvent = receipt.events.find((event) => event.event === "OrderStatusChanged");
+          if (statusChangeEvent.args.status !== 0) {
+            if (this.isBot) {
+              console.log("Filled some existing order, something went wrong");
+            }
+          }
+        }
+      })
+      .catch((error) => {
+        console.log("placeOrder failed");
+        console.log(error);
+        exit(1);
+      });
+  }
+  public async cancelAllOrders() {
+    if (this.Order_List.length > 0) {
+      console.log(`Cancelling ${this.Order_List.length} positions`);
+      let Order_List_Ids: string[] = [];
+      this.Order_List.forEach((order) => Order_List_Ids.push(order.id));
+      await this.TradePairs.cancelAllOrders(this.pairId, Order_List_Ids)
+        .then(async (tx) => {
+          // On startup the event listeners are not active yet so I empty the list here
+          this.Order_List = [];
+          await tx.wait();
+        })
+        .catch((error) => {
+          console.log("Cancel all orders failed");
+          console.log(error);
+          exit(1);
+        });
+    }
+  }
+  public async cancelOrder(orderId: string) {
+    await this.TradePairs.cancelOrder(this.pairId, orderId, {
+      gasLimit: 8000000,
+    })
+      .then((tx) => tx.wait())
+      .then((receipt) => {
+        if (receipt.status == 1) {
+          console.log(
+            chalk.gray.italic(
+              "Gas paid for cancelling order : " +
+                utils.formatUnits(receipt.gasUsed, "wei") +
+                " at " +
+                utils.formatUnits(receipt.effectiveGasPrice, "gwei")
+            )
+          );
+        }
+      })
+      .catch((error) => {
+        console.log("Cancel orders failed");
+        console.log(error);
+        exit(1);
+      });
+  }
+  public async getTopBuyOrder() {
+    return await this.OrderBook.nextPrice(this.buyBook, 0, 0);
+  }
+  public async getTopSellOrder() {
+    return await this.OrderBook.nextPrice(this.sellBook, 1, 0);
+  }
+  public async getOrderBookMiddle() {
+    const sellprice = await this.getTopSellOrder();
+    const buyprice = await this.getTopBuyOrder();
+    if (sellprice.gt(0) && buyprice.gt(0)) {
+      const price = buyprice.add(sellprice).div(2);
+      return parseFloat(utils.formatEther(price));
+    } else {
+      return 0;
+    }
+  }
+  public async createPairOrder(price: number, quantity: number, spread: number) {
+    await this.buyOrder(price - spread, quantity);
+    await this.sellOrder(price + spread, quantity);
+  }
+  public async getBuyBook() {
+    return await this.getBook(this.buyBook, 1);
+  }
+  public async getSellBook() {
+    return await this.getBook(this.sellBook, 1);
+  }
+  private async getBook(book: string, order: number) {
+    let OrderHistory: OrderHistoryPiece[] = [];
+    let OrderHistoryRaw = await this.OrderBook.getNOrdersOld(book, 100, order);
+    for (let i = 0; i < OrderHistoryRaw[0].length; i++) {
+      if (parseFloat(utils.formatEther(OrderHistoryRaw[1][i])) > 0) {
+        OrderHistory.push({
+          price: parseFloat(utils.formatEther(OrderHistoryRaw[0][i])),
+          quantity: parseFloat(utils.formatEther(OrderHistoryRaw[1][i])),
+        });
+      }
+    }
+    return OrderHistory;
   }
 }

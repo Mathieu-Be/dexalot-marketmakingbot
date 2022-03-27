@@ -34,6 +34,7 @@ export class PortfolioClass {
   public async init() {
     let initialisation_status = true;
 
+    // API initialisation
     await Promise.all([
       axios
         .get(this.DEXALOT_API + "/trading/deploymentabi/Portfolio")
@@ -51,6 +52,7 @@ export class PortfolioClass {
         }),
     ]);
 
+    // Contrat initialisation
     this.Portfolio = new ethers.Contract(
       this.Portfolio_ContractInfo.address,
       this.Portfolio_ContractInfo.abi.abi,
@@ -63,6 +65,7 @@ export class PortfolioClass {
       this.wallet
     ) as ERC20;
 
+    // Stopping if itialisation failed
     if (!initialisation_status) {
       console.log("Initialisation failed !");
       exit(1);
@@ -77,6 +80,7 @@ export class PortfolioClass {
   public async depositAVAX(quantity: number) {
     const quantityWei = utils.parseEther(quantity.toString());
 
+    // Checking if sufficient balance
     if ((await this.wallet.getBalance("latest")).gt(quantityWei)) {
       const transaction = {
         to: this.Portfolio.address,
@@ -94,10 +98,13 @@ export class PortfolioClass {
   public async depositERC20(quantity: number) {
     const quantityWei = utils.parseEther(quantity.toString());
 
+    // Checking if sufficient balance
     if ((await this.ERC20.balanceOf(this.wallet.address)).gt(quantityWei)) {
+      // Checking if sufficient allowance
       if (!(await this.ERC20.allowance(this.wallet.address, this.Portfolio.address)).gt(quantityWei)) {
         await this.ERC20.approve(this.Portfolio.address, MAX_UINT);
       }
+
       const tx = await this.Portfolio.depositToken(
         this.wallet.address,
         utils.formatBytes32String(this.tokenbase),
