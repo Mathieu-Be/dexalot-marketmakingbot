@@ -104,6 +104,7 @@ export class TradingPair {
     }
 
     if (createListeners) {
+      // "Order status changed event"
       this.TradePairs.on(
         "OrderStatusChanged",
         async (
@@ -169,6 +170,7 @@ export class TradingPair {
         }
       );
 
+      // "Executed event"
       this.TradePairs.on(
         "Executed",
         async (
