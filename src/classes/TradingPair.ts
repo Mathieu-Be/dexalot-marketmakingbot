@@ -291,8 +291,12 @@ export class TradingPair {
   public async getOrderBookMiddle() {
     const sellprice = await this.getTopSellOrder();
     const buyprice = await this.getTopBuyOrder();
-    const price = buyprice.add(sellprice).div(2);
-    return parseFloat(utils.formatEther(price));
+    if (sellprice.gt(0) && buyprice.gt(0)) {
+      const price = buyprice.add(sellprice).div(2);
+      return parseFloat(utils.formatEther(price));
+    } else {
+      return 0;
+    }
   }
   public async createPairOrder(price: number, quantity: number, spread: number) {
     await this.buyOrder(price - spread, quantity);

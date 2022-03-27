@@ -1,13 +1,12 @@
 import { TradingPair } from "./classes/TradingPair";
-import { cTable } from "console.table";
-
-const DEXALOT_API = "https://api.dexalot-dev.com/api";
-const spread = 10;
+import dotenv from "dotenv";
+dotenv.config();
 
 const main = async () => {
   const myPair = new TradingPair(process.env.DEXALOT_API, "TEAM1/AVAX", process.env.BOT_PRIVATE_KEY);
   await myPair.init(false);
-  await myPair.sellOrder(22, 10);
+  await myPair.sellOrder(15, 10);
+  await myPair.buyOrder(15, 10);
 };
 
 main();
