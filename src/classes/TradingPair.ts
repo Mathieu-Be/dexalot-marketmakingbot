@@ -324,13 +324,55 @@ export class TradingPair {
     return OrderHistory;
   }
   public async updateOrders() {
-    const newOrders = buildStrategy(this.currentPrice);
+    let newOrders = buildStrategy(this.currentPrice);
     console.log("Updating strategy...");
+
+    let cancelOrderCostGwei = BigNumber.from(0);
+    let addOrderCostGwei = BigNumber.from(0);
+    const gasPrice = await this.provider.getGasPrice();
+    try {
+      if (this.Order_List.length > 0)
+        cancelOrderCostGwei = await this.TradePairs.estimateGas.cancelOrder(
+          utils.formatBytes32String(this.pair),
+          this.Order_List[0].id
+        );
+      if (newOrders.length > 0)
+        addOrderCostGwei = await this.TradePairs.estimateGas.addOrder(
+          utils.formatBytes32String(this.pair),
+          utils.parseUnits(
+            newOrders[0].price.toFixed(this.pairInfo.quotedisplaydecimals),
+            this.pairInfo.quote_evmdecimals
+          ),
+          utils.parseUnits(
+            newOrders[0].quantity.toFixed(this.pairInfo.basedisplaydecimals),
+            this.pairInfo.base_evmdecimals
+          ),
+          newOrders[0].side,
+          1
+        );
+    } catch {
+      console.log(chalk.redBright("Gas estimation error"));
+    }
+
+    const replaceOrderCostAvax = parseFloat(utils.formatEther(cancelOrderCostGwei.add(addOrderCostGwei).mul(gasPrice)));
 
     for (let i = 0; i < this.Order_List.length; i++) {
       // If any order is not on the desired order list, cancels it
       if (!newOrders.find((order) => order.price === this.Order_List[i].price)) {
-        await this.cancelOrder(this.Order_List[i].id);
+        // But only if the replacement is worth the cost of the transaction
+        if (
+          newOrders.find(
+            (order) => Math.abs(order.price - this.Order_List[i].price) * order.quantity < replaceOrderCostAvax
+          )
+        ) {
+          console.log(chalk.bgMagentaBright("Order not worth replacing :", this.Order_List[i].price));
+          // In this case we don't want to cancel the order but we also don't want to create a new one
+          newOrders = newOrders.filter(
+            (order) => Math.abs(order.price - this.Order_List[i].price) * order.quantity < replaceOrderCostAvax
+          );
+        } else {
+          await this.cancelOrder(this.Order_List[i].id);
+        }
       }
     }
 

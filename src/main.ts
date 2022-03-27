@@ -19,6 +19,7 @@ const main = async () => {
   process.on("SIGINT", async () => {
     // Prevent double triggers of the event
     if (!hasExited) {
+      myPair.TradePairs.removeAllListeners();
       hasExited = true;
       console.log();
       await myPair.cancelAllOrders();
